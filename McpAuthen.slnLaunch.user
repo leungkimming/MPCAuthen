@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "All Projects",
+    "Projects": [
+      {
+        "Path": "McpHost\\McpHost.csproj",
+        "Action": "Start",
+        "DebugTarget": "McpHost"
+      },
+      {
+        "Path": "TimeService\\API.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      }
+    ]
+  }
+]
