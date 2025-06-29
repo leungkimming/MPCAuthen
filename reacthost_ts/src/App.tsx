@@ -1,59 +1,36 @@
 import React, { useState, useEffect, useRef, FormEvent, 
   ChangeEvent, KeyboardEvent } from 'react';
 import './App.css';
-import { createMCPClient, callMCPTool, listMCPTools, ChatMessage,
-  createLLMClient, ChatWithFunctionCalls, LLMClient } from './mcphelper';
-
-function getErrorMessage(err: unknown): string {
-  if (typeof err === 'object' && err && 'message' in (err as any)) {
-    return (err as any).message;
-  } else {
-    return JSON.stringify(err);
-  }
-}
+import { callMCPTool, ChatMessage, createLLMClient, ChatWithFunctionCalls, 
+  LLMClient, getErrorMessage, connectMCP } from './mcphelper';
 
 function App() {
   const [prompt, setPrompt] = useState<string>('');
   const [mcpStatus, setMcpStatus] = useState<string>('Disconnected');
   const mcpClientRef = useRef<any>(null);
+  const mcpClientRef_1 = useRef<any>(null); // For testing multiple MCP client reference
   const LLMClientRef = useRef<LLMClient | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { role: 'system', content: "You are a helpful assistant, delivering answer including the user's login ID as prefix of the response." }
   ]);
 
   useEffect(() => {
-    async function connectMCP() {
-      setMcpStatus("Connecting...");
-      console.log('[MCP] Connecting...');
+    (async () => {
       try {
-        const client = await createMCPClient("https://localhost:44322/sse");
+        const client = await connectMCP("https://localhost:44322/sse");
         mcpClientRef.current = client;
         setMcpStatus("Connected");
-        console.log('[MCP] Connected');
-        const toolsResult = await listMCPTools(client);
-        try {
-          if (toolsResult.tools.length === 0) {
-            console.log('[MCP] No tools available');
-          } else {
-            console.log('[MCP] Available tools:' + toolsResult.tools.map((tool: any) => `\n  - ${tool.name}: ${tool.description || ''}`).join(''));
-          }
-        } catch (err) {
-          const msg = getErrorMessage(err);
-          console.log(`[MCP] Error listing tools: ${msg}`);
-        }
       } catch (err) {
-        const msg = getErrorMessage(err);
-        console.log(`[MCP] Error connecting: ${msg}`);
         setMcpStatus("Error");
       }
-    }
-    connectMCP();
+    })();
     return () => {
       if (mcpClientRef.current && typeof mcpClientRef.current.Disconnect === 'function') {
         mcpClientRef.current.Disconnect();
       }
     };
   }, []);
+  // Initialize more MCP clients as needed
 
   // Fetch appsettings.json from public folder and initialize LLMClientRef
   useEffect(() => {
@@ -127,7 +104,7 @@ function App() {
     try {
       const llmOutput = await ChatWithFunctionCalls({
         llmClient: client,
-        mcpClient: mcpClientRef.current,
+        mcpClients: [mcpClientRef.current], // Can pass multiple MCP clients
         llmParams: {
           body: {
             max_tokens: 128

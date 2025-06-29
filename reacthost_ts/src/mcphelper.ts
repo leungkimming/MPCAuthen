@@ -13,9 +13,10 @@ export interface ChatMessage {
 }
 
 class MCPClient extends Client {
-  constructor(options: any, transport: SSEClientTransport) {
+  public url: string;
+  constructor(options: any, transport: SSEClientTransport, url: string) {
     super(options);
-    // No need to store transport, base Client handles it
+    this.url = url;
   }
   public Disconnect() {
     this.close();
@@ -45,7 +46,7 @@ export async function createMCPClient(sseUrl: string) {
     eventSourceInit: { withCredentials: true },
     requestInit: { credentials: "include" }
   });
-  const client = new MCPClient({ name: "mcp-client", version: "1.0.0" }, transport);
+  const client = new MCPClient({ name: "mcp-client", version: "1.0.0" }, transport, sseUrl);
   await client.connect(transport);
   return client;
 }
@@ -73,33 +74,40 @@ export function createLLMClient(endpoint: string, apiKey: string, modelId: strin
 
 export async function ChatWithFunctionCalls({
   llmClient,
-  mcpClient,
+  mcpClients,
   llmParams
 }: {
   llmClient: any,
-  mcpClient: any,
+  mcpClients: any[], // Now an array
   llmParams: any
 }): Promise<string> {
   let awaitingToolCallAnswer = true;
   let llmOutput = '';
   let tools: any[] = [];
-  // Always fetch the latest tools list from the server
-  const mcpTools = await listMCPTools(mcpClient);
-  if (mcpTools && Array.isArray(mcpTools.tools)) {
-    tools = mcpTools.tools.map((tool: any) => {
-      let parameters = tool.parameters;
-      if (!parameters && tool.inputSchema) parameters = tool.inputSchema;
-      return {
-        type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters
+  const toolNameToClient: Record<string, any> = {};
+  // Aggregate tools from all MCP servers, check for duplicates
+  for (const mcpClient of mcpClients) {
+    const mcpTools = await listMCPTools(mcpClient);
+    if (mcpTools && Array.isArray(mcpTools.tools)) {
+      for (const tool of mcpTools.tools) {
+        if (toolNameToClient[tool.name]) {
+          throw new Error(`Duplicate tool name detected: ${tool.name}`);
         }
-      };
-    });
-    console.log('DEBUG MCP tools passed to LLM:', tools);
+        toolNameToClient[tool.name] = mcpClient;
+        let parameters = tool.parameters;
+        if (!parameters && tool.inputSchema) parameters = tool.inputSchema;
+        tools.push({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters
+          }
+        });
+      }
+    }
   }
+  console.log('DEBUG MCP tools passed to LLM:', tools);
   while (awaitingToolCallAnswer) {
     const response = await llmClient.path('/chat/completions').post({
       ...llmParams,
@@ -124,7 +132,7 @@ export async function ChatWithFunctionCalls({
               id: toolCall.id
             });
           }
-          const toolMessages = await handleToolCalls(functionArray, mcpClient);
+          const toolMessages = await handleToolCalls(functionArray, toolNameToClient);
           for (const toolMsg of toolMessages) {
             console.log('[ToolCall Result passed back to LLM]', toolMsg.content);
             llmClient.addMessage(toolMsg);
@@ -151,7 +159,7 @@ export async function ChatWithFunctionCalls({
 
 export async function handleToolCalls(
   functionArray: { name: string; arguments: string; id: string }[],
-  mcpClient: any
+  toolNameToClient: Record<string, any>
 ): Promise<{
   role: 'tool';
   content: string;
@@ -161,23 +169,18 @@ export async function handleToolCalls(
   const messageArray: any[] = [];
   for (const func of functionArray) {
     let content = '';
-    //const tool = mcpToolsRef?.tools?.find((t: any) => t.name === func.name);
+    const mcpClient = toolNameToClient[func.name];
+    console.log('DEBUG found tool in mcp client with url:', mcpClient.url);
     if (mcpClient) {
       try {
         const args = JSON.parse(func.arguments);
         const { result: toolResult } = await callMCPTool(mcpClient, func.name, args);
         content = toolResult;
       } catch (err) {
-        let msg = '';
-        if (typeof err === 'object' && err && 'message' in err) {
-          msg = (err as any).message;
-        } else {
-          msg = JSON.stringify(err);
-        }
-        content = `[MCP] MCP Error: ${msg}`;
+        content = `[MCP] MCP Error: ${getErrorMessage(err)}`;
       }
     } else {
-      content = `[MCP] MCP client not connected`;
+      content = `[MCP] MCP client not found for tool: ${func.name}`;
     }
     messageArray.push({
       role: 'tool',
@@ -187,4 +190,40 @@ export async function handleToolCalls(
     });
   }
   return messageArray;
+}
+
+export function getErrorMessage(err: unknown): string {
+  if (typeof err === 'object' && err && 'message' in (err as any)) {
+    return (err as any).message;
+  } else {
+    return JSON.stringify(err);
+  }
+}
+
+export async function connectMCP(url: string, setMcpStatus?: (status: string) => void, mcpClientRef?: React.MutableRefObject<any>): Promise<any> {
+  setMcpStatus && setMcpStatus("Connecting...");
+  console.log('[MCP] Connecting...');
+  try {
+    const client = await createMCPClient(url);
+    if (mcpClientRef) mcpClientRef.current = client;
+    setMcpStatus && setMcpStatus("Connected");
+    console.log('[MCP] Connected');
+    const toolsResult = await listMCPTools(client);
+    try {
+      if (toolsResult.tools.length === 0) {
+        console.log('[MCP] No tools available');
+      } else {
+        console.log('[MCP] Available tools:' + toolsResult.tools.map((tool: any) => `\n  - ${tool.name}: ${tool.description || ''}`).join(''));
+      }
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      console.log(`[MCP] Error listing tools: ${msg}`);
+    }
+    return client;
+  } catch (err) {
+    const msg = getErrorMessage(err);
+    console.log(`[MCP] Error connecting: ${msg}`);
+    setMcpStatus && setMcpStatus("Error");
+    throw err;
+  }
 }
