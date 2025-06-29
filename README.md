@@ -11,7 +11,7 @@
     * Input prompt "What is the time in Melbourne" or New York or London or ...
     * Time zone auto changed by LLM 
 # Design
-![MCP Architecture](images//mcp.drawio.png)
+![MCP Architecture](images/mcp.drawio.png)
 * McpHost is the main App
     * With one of the 2 types of MCP Clients to communicate with MCP Servers
         * MCP client with StdioClientTransport for Standard Input/Output (STDIO) transport
