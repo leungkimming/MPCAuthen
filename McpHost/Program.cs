@@ -77,11 +77,6 @@ IChatClient chatClient = new ChatClientBuilder(
 
 IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =
 [
-//     new(ChatRole.System, @"
-// You are a helpful assistant delivering time in one sentence, 
-// including the user's login domain, ID, Date and Time in the specified city's GMT offset.
-// like 'Hi domain\ID, it is 10:08 on 17/12/2023 in Paris, France."),
-// ];
     new(ChatRole.System, @"
 You are a helpful assistant, delivering answer including the user's login ID as prefix of the response."),
 ];

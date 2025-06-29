@@ -87,6 +87,9 @@ export async function ChatWithFunctionCalls({
   const toolNameToClient: Record<string, any> = {};
   // Aggregate tools from all MCP servers, check for duplicates
   for (const mcpClient of mcpClients) {
+    if (!mcpClient) {
+      continue; // Skip if no MCP client is not connected
+    }
     const mcpTools = await listMCPTools(mcpClient);
     if (mcpTools && Array.isArray(mcpTools.tools)) {
       for (const tool of mcpTools.tools) {
@@ -144,6 +147,7 @@ export async function ChatWithFunctionCalls({
           if (choice.message?.content && choice.message.content !== '') {
             llmOutput += choice.message.content;
             awaitingToolCallAnswer = false;
+            console.log('[LLM token used]', response.body.usage?.total_tokens || 0);
           }
         }
       }
@@ -200,20 +204,17 @@ export function getErrorMessage(err: unknown): string {
   }
 }
 
-export async function connectMCP(url: string, setMcpStatus?: (status: string) => void, mcpClientRef?: React.MutableRefObject<any>): Promise<any> {
-  setMcpStatus && setMcpStatus("Connecting...");
-  console.log('[MCP] Connecting...');
+export async function connectMCP(url: string): Promise<any> {
+  console.log(`[MCP] Connecting ${url}...`);
   try {
     const client = await createMCPClient(url);
-    if (mcpClientRef) mcpClientRef.current = client;
-    setMcpStatus && setMcpStatus("Connected");
     console.log('[MCP] Connected');
     const toolsResult = await listMCPTools(client);
     try {
       if (toolsResult.tools.length === 0) {
         console.log('[MCP] No tools available');
       } else {
-        console.log('[MCP] Available tools:' + toolsResult.tools.map((tool: any) => `\n  - ${tool.name}: ${tool.description || ''}`).join(''));
+        console.log('[MCP] Available tool(s) listed:' + toolsResult.tools.map((tool: any) => `\n  - ${tool.name}: ${tool.description || ''}`).join(''));
       }
     } catch (err) {
       const msg = getErrorMessage(err);
@@ -223,7 +224,6 @@ export async function connectMCP(url: string, setMcpStatus?: (status: string) =>
   } catch (err) {
     const msg = getErrorMessage(err);
     console.log(`[MCP] Error connecting: ${msg}`);
-    setMcpStatus && setMcpStatus("Error");
     throw err;
   }
 }

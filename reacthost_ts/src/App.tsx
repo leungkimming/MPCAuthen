@@ -107,7 +107,7 @@ function App() {
         mcpClients: [mcpClientRef.current], // Can pass multiple MCP clients
         llmParams: {
           body: {
-            max_tokens: 128
+            max_tokens: 256
           },
           temperature: 0.1,
           top_p: 1.0,

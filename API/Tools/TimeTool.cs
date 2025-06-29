@@ -21,7 +21,7 @@ public class TimeTool
         string name = context?.User?.Identity?.Name ?? "anonymous";
 
         DateTime cTime = _timeService.GetCurrentTime();
-        string reply = $"Hi {name}, it is {cTime.Hour}:{cTime.Minute} on {cTime:dd/MM/yyyy} in Hong Kong, which is GMT +8. You have to adjust to {city}'s GMT offset before answering.";
+        string reply = $"Hi {name}, it is {cTime.Hour}:{cTime.Minute} on {cTime:dd/MM/yyyy} in Hong Kong, You have to adjust to {city}'s GMT offset before answering.";
         Console.WriteLine($"MCP called and I reply: {reply}");
         return reply;
     }
