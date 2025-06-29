@@ -42,6 +42,7 @@ function App() {
         const modelId = config.LLM?.ModelId;
         if (endpoint && apiKey && modelId) {
           LLMClientRef.current = createLLMClient(endpoint, apiKey, modelId);
+          LLMClientRef.current.addMessage(chatMessages[0]); // Sync system message to LLM client
         }
       })
       .catch(err => {
