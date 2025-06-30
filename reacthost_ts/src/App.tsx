@@ -127,8 +127,8 @@ function App() {
 
   return (
     <div className="App" style={{ padding: 15 }}>
-      <h2 style={{ marginTop: -10 }}>ReactJS UI Chat App with MCP Server support</h2>
-      <div>MCP Server Connection Status: <b>{mcpStatus}</b></div>
+      <div className="header-title">ReactJS UI Chat App with MCP Server support</div>
+      <div className={`status ${mcpStatus.toLowerCase()}`}>MCP Server Connection Status: <b>{mcpStatus}</b></div>
       <div style={{ marginTop: 5, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         {/* Chat message list */}
         <div
@@ -140,16 +140,11 @@ function App() {
               <div
                 key={idx}
                 className={`chat-message ${msg.role}`}
-                style={{
-                  textAlign: msg.role === 'user' ? 'right' : 'left',
-                  margin: '8px 0',
-                  color: msg.role === 'user' ? '#1976d2' : '#333',
-                  fontWeight: msg.role === 'user' ? 500 : 400
-                }}
+                // Remove inline styles, use CSS classes
               >
-                {msg.role === 'user' && '[User] '}
-                {msg.role === 'assistant' && '[LLM] '}
-                {msg.role !== 'user' && msg.role !== 'assistant' ? '' : ''}
+                {msg.role === 'user' && <span>[User] </span>}
+                {msg.role === 'assistant' && <span>[LLM] </span>}
+                {msg.role !== 'user' && msg.role !== 'assistant' && <span>[{msg.role}] </span>}
                 {msg.content}
               </div>
             )
