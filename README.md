@@ -236,7 +236,7 @@ import { ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
         top_p: 1.0
         });
     ...
-    // loop thru all choice of response.body.choices until choice.finish_reason != 'tool_calls'
-    // You need to write your own code to get LLM's 'tool_calls' requests, call all the tools, add the response to messages
+    // loop thru all response.body.choices until choice.finish_reason != 'tool_calls'
+    // You need to write your own code to parse the LLM's 'tool_calls' requests, call all the mcp tools, add the response to messages
     // Detail logic please refer mcphelper.ts async function ChatWithFunctionCalls
 ```
