@@ -10,7 +10,7 @@
   <ItemGroup>
 	<PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.1" />
 	<PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.3.0-preview.1" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
 	<PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="3.0.0" />
   </ItemGroup>
 

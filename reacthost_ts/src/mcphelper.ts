@@ -26,9 +26,8 @@ class MCPClient extends Client {
 export class LLMClient {
   private client: any;
   private Messages: ChatMessage[] = [];
-  constructor(endpoint: string, apiKey: string, modelId: string) {
-    const fullEndpoint = endpoint.replace(/\/$/, '') + '/openai/deployments/' + modelId;
-    this.client = ModelClient(fullEndpoint, new AzureKeyCredential(apiKey));
+  constructor(endpoint: string) {
+    this.client = ModelClient(endpoint, new AzureKeyCredential("DummyKey"));
   }
   public addMessage(msg: ChatMessage) {
     this.Messages.push(msg);
@@ -68,8 +67,8 @@ export async function callMCPTool(client: any, name: string, args: any) {
   return { result: extractedText ?? JSON.stringify(result) };
 }
 
-export function createLLMClient(endpoint: string, apiKey: string, modelId: string) {
-  return new LLMClient(endpoint, apiKey, modelId);
+export function createLLMClient(endpoint: string) {
+  return new LLMClient(endpoint);
 }
 
 export async function ChatWithFunctionCalls({
@@ -110,9 +109,9 @@ export async function ChatWithFunctionCalls({
       }
     }
   }
-  console.log('DEBUG MCP tools passed to LLM:', tools);
+  console.log('DEBUG MCP tools passed to LLM via LLM Proxy API:', tools);
   while (awaitingToolCallAnswer) {
-    const response = await llmClient.path('/chat/completions').post({
+    const response = await llmClient.path('/LLM').post({
       ...llmParams,
       body: {
         ...llmParams.body,
@@ -120,8 +119,9 @@ export async function ChatWithFunctionCalls({
         tools
       }
     });
-    if (response.body && Array.isArray(response.body.choices)) {
-      for (const choice of response.body.choices) {
+    const responseBody = response.body;
+    if (responseBody && Array.isArray(responseBody.choices)) {
+      for (const choice of responseBody.choices) {
         const toolCallArray = choice.message?.tool_calls;
         if (toolCallArray) {
           choice.message.role = 'assistant';
@@ -147,7 +147,7 @@ export async function ChatWithFunctionCalls({
           if (choice.message?.content && choice.message.content !== '') {
             llmOutput += choice.message.content;
             awaitingToolCallAnswer = false;
-            console.log('[LLM token used]', response.body.usage?.total_tokens || 0);
+            console.log('[LLM token used]', responseBody.usage?.total_tokens || 0);
           }
         }
       }

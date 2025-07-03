@@ -8,9 +8,8 @@
         "DebugTarget": "McpHost"
       },
       {
-        "Path": "TimeService\\API.csproj",
-        "Action": "Start",
-        "DebugTarget": "IIS Express"
+        "Path": "API\\API.csproj",
+        "Action": "Start"
       }
     ]
   }

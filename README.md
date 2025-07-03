@@ -43,6 +43,16 @@
         * For LLM to call via MCP SSE Clients
         * Present data in a sentense, with optional instructions for LLM to process
     * Both API controller and MCP Servers should call the same Service layer to obtain data
+    * LLM Proxy
+        * To eliminate the need for reacthost_ts UI to directly call Azure LLM endpoint passing Azure API Key
+        * When reacthost_ts UI needs to call LLM, set Uri to this LLM Proxy API
+        * This LLM Proxy redirect the traffic to the real Azure LLM endpoint with Azure API Key and redirect the response back to reacthost_ts UI
+* reacthost_ts UI is a React UI MCP Host
+    * It is a Chat App with MCP Servers registered
+    * Post user's prompt to LLM via the LLM Proxy API, with Tools collected from all MCP Servers
+    * Response to LLM Proxy Response's Tool Call, call the tool and add tool's response to the Chat Messages
+    * Loop back to the LLM endpoint until no more tool call requests from LLM
+    * Display LLM's final content in the Chat area
 ## STDIO
 * MCP clients create McpServer.ConsoleHost in-process
 * McpServer.ConsoleHosts use HTTPClient to call external application's API controller
@@ -148,7 +158,7 @@ import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotoc
   }
 ```
 ## LLM (Azure OpenAI with function calling)
-### .NET
+### .NET (In C# console, WPF, MAUI, API)
 * Very complete with automated function calling build-in
 ```
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
@@ -185,7 +195,8 @@ IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =
 
 ChatResponse response = await chatClient.GetResponseAsync(chatHistory, chatOptions);
 ```
-### React
+### React UI (Not recommended. Risk of exposing the Azure API Key)
+* In actual implementation, the ModelClient's Uri should point to API's LLM Proxy.
 ```
     "@azure-rest/ai-inference": "latest",
 ```

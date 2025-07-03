@@ -37,11 +37,9 @@ function App() {
     fetch('/appsettings.json')
       .then(res => res.json())
       .then(config => {
-        const endpoint = config.LLM?.EndPoint;
-        const apiKey = config.LLM?.Azure_API_key;
-        const modelId = config.LLM?.ModelId;
-        if (endpoint && apiKey && modelId) {
-          LLMClientRef.current = createLLMClient(endpoint, apiKey, modelId);
+        const endpoint = config.LLMProxy?.EndPoint;
+        if (endpoint) {
+          LLMClientRef.current = createLLMClient(endpoint);
           LLMClientRef.current.addMessage(chatMessages[0]); // Sync system message to LLM client
         }
       })
