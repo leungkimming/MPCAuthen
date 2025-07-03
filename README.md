@@ -1,7 +1,8 @@
 # Quick start
-* Debug Run API using IIS Express (required AD authentication)
+* API server
+    * Replace Azure_API_key in API\appsettings.json
+    * Debug Run API using IIS Express (required AD authentication)
 * reacthost_ts
-    * Replace Azure_API_key in .\public\appsettings.json
     * run 'npm install'
     * Open a terminal or DOS prompt, run 'npm start'
     * React Chat UI will open in default browse. To see all debug messages, press [F12] in web browser
