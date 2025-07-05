@@ -27,6 +27,8 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 app.UseCors("AllowLocal3000");
+// Register SSE credential validation middleware BEFORE MapMcp
+app.UseMiddleware<SseCredentialValidationMiddleware>();
 app.MapMcp().RequireAuthorization();
 app.MapControllers();
 app.UseAuthentication();
