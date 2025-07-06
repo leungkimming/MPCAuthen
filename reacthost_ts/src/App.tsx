@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, FormEvent,
   ChangeEvent, KeyboardEvent } from 'react';
 import './App.css';
 import { callMCPTool, ChatMessage, createLLMClient, ChatWithFunctionCalls, 
-  LLMClient, getErrorMessage, connectMCP, navigate2bookmeetings } from './mcphelper';
+  LLMClient, getErrorMessage, connectMCP } from './mcphelper';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import BookUrgentMeeting from './BookUrgentMeeting';
 import Dialog from '@mui/material/Dialog';
@@ -23,9 +23,14 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const client = await connectMCP("https://localhost:44322/sse");
-        mcpClientRef.current = client;
-        setMcpStatus("Connected");
+        const endpoint = process.env.REACT_APP_MCP_ENDPOINT;
+        if (endpoint) {
+          const client = await connectMCP(endpoint);
+          mcpClientRef.current = client;
+          setMcpStatus("Connected");
+        } else {
+          console.error('REACT_APP_MCP_ENDPOINT is not set in .env');
+        }
       } catch (err) {
         setMcpStatus("Error");
       }
@@ -40,14 +45,35 @@ function App() {
 
   // Fetch LLM endpoint from environment variable and initialize LLMClientRef
   useEffect(() => {
+    if (!mcpClientRef.current) {
+      console.log('MCP client is not yet initialized');
+      return;
+    }
     const endpoint = process.env.REACT_APP_LLM_PROXY_ENDPOINT;
     if (endpoint) {
       LLMClientRef.current = createLLMClient(endpoint);
-      LLMClientRef.current.addMessage(chatMessages[0]); // Sync system message to LLM client
+      LLMClientRef.current.addMessage(chatMessages[0]);
+      LLMClientRef.current.addMCPClient(mcpClientRef.current);
+      const initialTool = {
+        type: 'function',
+        function: {
+          name: 'navigate2bookmeetings',
+          description: 'book an urgent meeting in the city and datetime',
+          parameters: {
+            type: 'object',
+            properties: {
+              city: { type: 'string', description: 'City to book the meeting in' },
+              DateTime: { type: 'string', description: 'Date and time for the meeting' }
+            },
+            required: ['city', 'DateTime']
+          }
+        }
+      };
+      LLMClientRef.current.addTools(initialTool);
     } else {
       console.error('REACT_APP_LLM_PROXY_ENDPOINT is not set in .env');
     }
-  }, []);
+  }, [mcpClientRef.current]);
 
   const handleCallAPI = async (e: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -85,6 +111,7 @@ function App() {
     }
   };
 
+  
   const handleCallLLM = async () => {
     console.log('[LLM] Calling LLM...');
     const client = LLMClientRef.current;
@@ -103,7 +130,6 @@ function App() {
     try {
       const llmOutput = await ChatWithFunctionCalls({
         llmClient: client,
-        mcpClients: [mcpClientRef.current], // Can pass multiple MCP clients
         llmParams: {
           body: {
             max_tokens: 256
@@ -209,5 +235,12 @@ function App() {
     </Router>
   );
 }
+
+export function navigate2bookmeetings(jsonParam: string): Promise<{ jsonParam?: string }> {
+  return Promise.resolve({ jsonParam }); 
+}
+
+// Ensure the function is available on globalThis for tool call execution
+(globalThis as any).navigate2bookmeetings = navigate2bookmeetings;
 
 export default App;

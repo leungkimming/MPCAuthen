@@ -26,6 +26,8 @@ class MCPClient extends Client {
 export class LLMClient {
   private client: any;
   private Messages: ChatMessage[] = [];
+  private Tools: any[] = [];
+  private McpClients: any[] = [];
   constructor(endpoint: string) {
     this.client = ModelClient(endpoint, new AzureKeyCredential("DummyKey"));
   }
@@ -34,6 +36,18 @@ export class LLMClient {
   }
   public getMessages() {
     return this.Messages;
+  }
+  public addTools(tool: any) {
+    this.Tools.push(tool);
+  }
+  public getTools() {
+    return this.Tools;
+  }
+  public addMCPClient(client: any) {
+    this.McpClients.push(client);
+  }
+  public getMCPClients() {
+    return this.McpClients;
   }
   public path(...args: any[]) {
     return this.client.path(...args);
@@ -73,11 +87,9 @@ export function createLLMClient(endpoint: string) {
 
 export async function ChatWithFunctionCalls({
   llmClient,
-  mcpClients,
   llmParams
 }: {
   llmClient: any,
-  mcpClients: any[], // Now an array
   llmParams: any
 }): Promise<string> {
   let awaitingToolCallAnswer = true;
@@ -85,7 +97,7 @@ export async function ChatWithFunctionCalls({
   let tools: any[] = [];
   const toolNameToClient: Record<string, any> = {};
   // Aggregate tools from all MCP servers, check for duplicates
-  for (const mcpClient of mcpClients) {
+  for (const mcpClient of llmClient.getMCPClients()) {
     if (!mcpClient) {
       continue; // Skip if no MCP client is not connected
     }
@@ -109,22 +121,10 @@ export async function ChatWithFunctionCalls({
       }
     }
   }
-  // Add navigate2bookmeetings as a tool for the LLM
-  tools.push({
-    type: 'function',
-    function: {
-      name: 'navigate2bookmeetings',
-      description: 'book an urgent meeting in the city and datetime',
-      parameters: {
-        type: 'object',
-        properties: {
-          city: { type: 'string', description: 'City to book the meeting in' },
-          DateTime: { type: 'string', description: 'Date and time for the meeting' }
-        },
-        required: ['city', 'DateTime']
-      }
-    }
-  });
+  // Add local tools on top of mcp tools
+  for (const tool of llmClient.getTools()) {
+    tools.push(tool);
+  }
   console.log('DEBUG MCP tools passed to LLM via LLM Proxy API:', tools);
   while (awaitingToolCallAnswer) {
     const response = await llmClient.path('/LLM').post({
@@ -254,10 +254,3 @@ export async function connectMCP(url: string): Promise<any> {
     throw err;
   }
 }
-
-export function navigate2bookmeetings(jsonParam: string): Promise<{ jsonParam?: string }> {
-  return Promise.resolve({ jsonParam }); 
-}
-
-// Ensure the function is available on globalThis for tool call execution
-(globalThis as any).navigate2bookmeetings = navigate2bookmeetings;
