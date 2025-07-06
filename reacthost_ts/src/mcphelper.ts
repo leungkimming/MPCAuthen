@@ -109,6 +109,22 @@ export async function ChatWithFunctionCalls({
       }
     }
   }
+  // Add navigate2bookmeetings as a tool for the LLM
+  tools.push({
+    type: 'function',
+    function: {
+      name: 'navigate2bookmeetings',
+      description: 'book an urgent meeting in the city and datetime',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: 'City to book the meeting in' },
+          DateTime: { type: 'string', description: 'Date and time for the meeting' }
+        },
+        required: ['city', 'DateTime']
+      }
+    }
+  });
   console.log('DEBUG MCP tools passed to LLM via LLM Proxy API:', tools);
   while (awaitingToolCallAnswer) {
     const response = await llmClient.path('/LLM').post({
@@ -174,7 +190,6 @@ export async function handleToolCalls(
   for (const func of functionArray) {
     let content = '';
     const mcpClient = toolNameToClient[func.name];
-    console.log('DEBUG found tool in mcp client with url:', mcpClient.url);
     if (mcpClient) {
       try {
         const args = JSON.parse(func.arguments);
@@ -184,7 +199,27 @@ export async function handleToolCalls(
         content = `[MCP] MCP Error: ${getErrorMessage(err)}`;
       }
     } else {
-      content = `[MCP] MCP client not found for tool: ${func.name}`;
+      // Check if it's a local TypeScript function
+      if (typeof (globalThis as any)[func.name] === 'function') {
+        try {
+          const args = JSON.parse(func.arguments);
+          if (func.name === 'navigate2bookmeetings') {
+            const result = await (globalThis as any)[func.name](args.city, args.DateTime);
+            if (result && result.cancelled) {
+              content = '[Local] user cancelled the booking';
+            } else {
+              content = '[Local] navigate2bookmeetings booked';
+            }
+          } else {
+            (globalThis as any)[func.name](...Object.values(args));
+            content = `[Local] ${func.name} executed with arguments ${JSON.stringify(args)}`;
+          }
+        } catch (err) {
+          content = `[Local] Error executing ${func.name}: ${getErrorMessage(err)}`;
+        }
+      } else {
+        content = `[MCP] MCP client / local function not found for tool: ${func.name}`;
+      }
     }
     messageArray.push({
       role: 'tool',
@@ -227,3 +262,11 @@ export async function connectMCP(url: string): Promise<any> {
     throw err;
   }
 }
+
+export function navigate2bookmeetings(city: string, DateTime: string): Promise<{ city?: string; DateTime?: string; description?: string; participants?: string; cancelled?: boolean }> {
+  // This function will be replaced in App.tsx to show the dialog and return a promise
+  return Promise.resolve({ city, DateTime }); // fallback for SSR or direct call
+}
+
+// Ensure the function is available on globalThis for tool call execution
+(globalThis as any).navigate2bookmeetings = navigate2bookmeetings;
