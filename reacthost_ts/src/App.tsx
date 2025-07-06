@@ -17,7 +17,7 @@ function App() {
     { role: 'system', content: "You are a helpful assistant, delivering answer including the user's login ID as prefix of the response." }
   ]);
   const [showBookMeetingDialog, setShowBookMeetingDialog] = useState(false);
-  const [bookMeetingParams, setBookMeetingParams] = useState<{city?: string, DateTime?: string}>({});
+  const [bookMeetingParams, setBookMeetingParams] = useState<{jsonParam?: string}>({});
   const bookMeetingPromiseRef = useRef<((result: any) => void) | null>(null);
 
   useEffect(() => {
@@ -125,8 +125,8 @@ function App() {
 
   // Replace navigate2bookmeetings to open dialog and return a Promise
   useEffect(() => {
-    (globalThis as any).navigate2bookmeetings = (city: string, DateTime: string) => {
-      setBookMeetingParams({ city, DateTime });
+    (globalThis as any).navigate2bookmeetings = (jsonParam: string) => {
+      setBookMeetingParams({ jsonParam });
       setShowBookMeetingDialog(true);
       return new Promise(resolve => {
         bookMeetingPromiseRef.current = resolve;
@@ -135,14 +135,10 @@ function App() {
   }, []);
 
   // Update handleBookMeetingComplete to resolve the Promise
-  const handleBookMeetingComplete = (data?: {city?: string, DateTime?: string, description?: string, participants?: string}) => {
+  const handleBookMeetingComplete = (data?: {city?: string, DateTime?: string, description?: string, participants?: string, result?: string}) => {
     setShowBookMeetingDialog(false);
     if (bookMeetingPromiseRef.current) {
-      if (data && data.city && data.DateTime) {
-        bookMeetingPromiseRef.current({ ...data, cancelled: false });
-      } else {
-        bookMeetingPromiseRef.current({ cancelled: true });
-      }
+      bookMeetingPromiseRef.current(data?.result);
       bookMeetingPromiseRef.current = null;
     }
   };
@@ -155,7 +151,7 @@ function App() {
           <a href="#" onClick={e => { e.preventDefault(); setBookMeetingParams({}); setShowBookMeetingDialog(true); }}>Book Urgent Meeting</a>
         </nav>
         <Dialog open={showBookMeetingDialog} onClose={() => setShowBookMeetingDialog(false)} maxWidth="sm" fullWidth>
-          <BookUrgentMeeting onComplete={handleBookMeetingComplete} city={bookMeetingParams.city} dateTime={bookMeetingParams.DateTime} />
+          <BookUrgentMeeting onComplete={handleBookMeetingComplete} jsonParam={bookMeetingParams.jsonParam} />
         </Dialog>
         <Routes>
           <Route path="/" element={

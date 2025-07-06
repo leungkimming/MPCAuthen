@@ -203,17 +203,9 @@ export async function handleToolCalls(
       if (typeof (globalThis as any)[func.name] === 'function') {
         try {
           const args = JSON.parse(func.arguments);
-          if (func.name === 'navigate2bookmeetings') {
-            const result = await (globalThis as any)[func.name](args.city, args.DateTime);
-            if (result && result.cancelled) {
-              content = '[Local] user cancelled the booking';
-            } else {
-              content = '[Local] navigate2bookmeetings booked';
-            }
-          } else {
-            (globalThis as any)[func.name](...Object.values(args));
-            content = `[Local] ${func.name} executed with arguments ${JSON.stringify(args)}`;
-          }
+          const result = await (globalThis as any)[func.name](JSON.stringify(args));
+          content = result?.result ?? String(result);
+          console.log(`[Local] Executed local function ${func.name} with jsonParam: ${JSON.stringify(args)} => Result: ${content}`);
         } catch (err) {
           content = `[Local] Error executing ${func.name}: ${getErrorMessage(err)}`;
         }
@@ -263,9 +255,8 @@ export async function connectMCP(url: string): Promise<any> {
   }
 }
 
-export function navigate2bookmeetings(city: string, DateTime: string): Promise<{ city?: string; DateTime?: string; description?: string; participants?: string; cancelled?: boolean }> {
-  // This function will be replaced in App.tsx to show the dialog and return a promise
-  return Promise.resolve({ city, DateTime }); // fallback for SSR or direct call
+export function navigate2bookmeetings(jsonParam: string): Promise<{ jsonParam?: string }> {
+  return Promise.resolve({ jsonParam }); 
 }
 
 // Ensure the function is available on globalThis for tool call execution

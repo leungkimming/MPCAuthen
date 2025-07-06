@@ -19,25 +19,43 @@ function parseDateTime(val: string): Date | null {
 }
 
 interface BookUrgentMeetingProps {
-  onComplete: (data?: { city?: string; DateTime?: string; description?: string; participants?: string }) => void;
-  city?: string;
-  dateTime?: string;
+  onComplete: (data?: { city?: string; DateTime?: string; description?: string; participants?: string; result?: string }) => void;
+  jsonParam?: string;
 }
 
-const BookUrgentMeeting: React.FC<BookUrgentMeetingProps> = ({ onComplete, city: propCity, dateTime: propDateTime }) => {
+const BookUrgentMeeting: React.FC<BookUrgentMeetingProps> = ({ onComplete, jsonParam }) => {
+  let parms = {};
+  try {
+    parms = jsonParam ? JSON.parse(jsonParam) : {};
+  } catch {
+    parms = {};
+  }
   const [searchParams] = useSearchParams();
-  const initialCity = propCity || searchParams.get('city') || '';
-  const initialDateTimeRaw = propDateTime || searchParams.get('dateTime') || '';
+  const initialCity = (parms as any).city || '';
+  const initialDateTimeRaw = (parms as any).DateTime || '';
   const [description, setDescription] = useState('');
   const [participants, setParticipants] = useState('');
   const [city, setCity] = useState(initialCity);
   const [dateTime, setDateTime] = useState<Date | null>(parseDateTime(initialDateTimeRaw));
   const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
-    if (onComplete) onComplete({ city, DateTime: dateTime ? dateTime.toISOString() : '', description, participants });
+    let resultMsg = '';
+    if (dateTime && city) {
+      const dateStr = dateTime.toLocaleDateString('en-GB');
+      const timeStr = dateTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      resultMsg = `urgent meeting booked for ${city} on ${dateStr} at ${timeStr}`;
+      setResult(resultMsg);
+    }
+    if (onComplete) onComplete({ city, DateTime: dateTime ? dateTime.toISOString() : '', description, participants, result: resultMsg });
+  };
+
+  const handleCancel = () => {
+    setResult('user cancelled the booking request');
+    if (onComplete) onComplete({ result: 'user cancelled the booking request' });
   };
 
   return (
@@ -103,8 +121,13 @@ const BookUrgentMeeting: React.FC<BookUrgentMeetingProps> = ({ onComplete, city:
             </label>
           </div>
           <button type="submit" style={{ padding: '8px 16px', marginRight: 8 }}>Book Meeting</button>
-          <button type="button" style={{ padding: '8px 16px' }} onClick={() => onComplete && onComplete()}>Cancel</button>
+          <button type="button" style={{ padding: '8px 16px' }} onClick={handleCancel}>Cancel</button>
         </form>
+      )}
+      {result && (
+        <div style={{ marginTop: 16, color: '#333' }}>
+          <em>{result}</em>
+        </div>
       )}
     </div>
   );
