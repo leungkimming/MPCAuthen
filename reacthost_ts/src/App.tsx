@@ -63,7 +63,8 @@ function App() {
             type: 'object',
             properties: {
               city: { type: 'string', description: 'City to book the meeting in' },
-              DateTime: { type: 'string', description: 'Date and time for the meeting' }
+              DateTime: { type: 'string', description: 'Date and time for the meeting' },
+              Description: { type: 'string', description: 'Agenda or meeting description' }
             },
             required: ['city', 'DateTime']
           }
