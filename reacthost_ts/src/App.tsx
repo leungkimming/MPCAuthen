@@ -38,21 +38,15 @@ function App() {
   }, []);
   // Initialize more MCP clients as needed
 
-  // Fetch appsettings.json from public folder and initialize LLMClientRef
+  // Fetch LLM endpoint from environment variable and initialize LLMClientRef
   useEffect(() => {
-    fetch('/appsettings.json')
-      .then(res => res.json())
-      .then(config => {
-        const endpoint = config.LLMProxy?.EndPoint;
-        if (endpoint) {
-          LLMClientRef.current = createLLMClient(endpoint);
-          LLMClientRef.current.addMessage(chatMessages[0]); // Sync system message to LLM client
-        }
-      })
-      .catch(err => {
-        // Optionally handle error
-        console.error('Failed to load appsettings.json', err);
-      });
+    const endpoint = process.env.REACT_APP_LLM_PROXY_ENDPOINT;
+    if (endpoint) {
+      LLMClientRef.current = createLLMClient(endpoint);
+      LLMClientRef.current.addMessage(chatMessages[0]); // Sync system message to LLM client
+    } else {
+      console.error('REACT_APP_LLM_PROXY_ENDPOINT is not set in .env');
+    }
   }, []);
 
   const handleCallAPI = async (e: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {

@@ -4,7 +4,8 @@
     * Debug Run API using IIS Express (required AD authentication)
 * reacthost_ts
     * run 'npm install'
-    * Open a terminal or DOS prompt, run 'npm start'
+    * Copy .env.example to .env in reacthost_ts
+    * Run 'npm start'
     * React Chat UI will open in default browse. To see all debug messages, press [F12] in web browser
         * Test 1: 
             * Notice that MCP Server Connection Status: Connected
@@ -15,13 +16,19 @@
         * Test 3: Click the 'Call the MCP' button.
             * Directly called 'GetCurrentTime' in MCP server passing 'New York' as parameter
             * It is a sentence for LLM to understand, containing login user (prove of authentication in MCP server), HK DateTime and instruction to adjust GMT for New York. (LLM know the GMT different between HK and New York)
-        * Test 4: Type 'What is the current time in Melbourne' and press the 'Call LLM' button
+        * Test 4: Prompt: 'What is the current time in Melbourne' and press the 'Call LLM' button
             * Expand the console messages and notice the 'GetCurrentTime' MCP tool passed to LLM
             * Expand the console messages and notice the LLM request tool call of 'GetCurrentTime' passing 'Melbourne'
             * Notice the result of 'GetCurrentTime' MCP Tool passed back to LLM. The content is similiar to Test 3, except the city
             * Notice the LLM Token used.
             * In the Chat area, notice LLM's reply after considering the result from 'GetCurrentTime' MCP Tool, including the authenticated user's name.
-        * Test 5: Shutdown MCP Server
+        * Test 5: LLM invoke App dialog for user
+            * Prmmpt: 'What is the time in New York?'
+            * Prompt: 'Then, book an urgent meeting for me in 15 minutes'
+            * Dialog shown with City and DateTime. Input Description & Participants and press 'Book Meeting' (or just cancel)
+            * Note LLM's reply message.
+            * To invoke the 'Book urgent meeting' function like traditional Apps, click the 'Book Urgent Meeting' at the top.
+        * Test 6: Shutdown MCP Server
             * Stop the API debug run
             * Refresh the Chat UI in the browser
             * Notice MCP Server Connection Status: Error
