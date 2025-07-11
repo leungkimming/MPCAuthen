@@ -1,12 +1,36 @@
 [
   {
-    "Name": "All Projects",
+    "Name": "Console App",
     "Projects": [
       {
-        "Path": "McpHost\\McpHost.csproj",
+        "Path": "API\\API.csproj",
         "Action": "Start",
-        "DebugTarget": "McpHost"
+        "DebugTarget": "IIS Express"
       },
+      {
+        "Path": "McpHost\\McpHost.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Blazor App",
+    "Projects": [
+      {
+        "Path": "API\\API.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      },
+      {
+        "Path": "BlazorClient\\BlazorApp.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      }
+    ]
+  },
+  {
+    "Name": "React App",
+    "Projects": [
       {
         "Path": "API\\API.csproj",
         "Action": "Start"

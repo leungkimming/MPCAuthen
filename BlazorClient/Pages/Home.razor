@@ -1,0 +1,178 @@
+﻿@page "/"
+@inject IJSRuntime JS
+@inject HttpClient Http
+@using Azure;
+@using Azure.AI.OpenAI;
+@using Microsoft.Extensions.AI;
+@using Microsoft.Extensions.Configuration;
+@using ModelContextProtocol;
+@using ModelContextProtocol.Client;
+@using ModelContextProtocol.Protocol;
+
+<PageTitle>AI Chat</PageTitle>
+
+<h1>AI Chat</h1>
+
+<div class="chat-app-container">
+    <div class="chat-history" id="chatHistory">
+        @foreach (var message in chatHistory)
+        {
+            if (message.Role == ChatRole.System)
+            {
+                <div class="chat-bubble system-bubble">@message.Text</div>
+            }
+            else if (message.Role == ChatRole.Assistant)
+            {
+                <div class="chat-bubble assistant-bubble">@message.Text</div>
+            }
+            else
+            {
+                <div class="chat-bubble user-bubble">@message.Text</div>
+            }
+        }
+    </div>
+    <div class="chat-input-bar">
+        <input class="chat-input" @bind="prompt" @bind:event="oninput" placeholder="Type your message..." @onkeydown="HandleKeyDown" />
+        <button class="send-button" @onclick="async () => await SendMessage()">Send</button>
+    </div>
+    <div class="chat-label-actions chat-action-buttons">
+        <label style="margin-right:1rem;">Press [F12] to see console log for these button actions -&gt;</label>
+        <button class="action-button" @onclick="CallApi">Call API</button>
+        <button class="action-button" @onclick="CallMcp">Call MCP</button>
+    </div>
+</div>
+@if (showBookMeetingDialog) {
+    <BookMeetingDialog DateParam="@bookMeetingDateTime"
+                       AgendaParam="@bookMeetingAgenda"
+                       City="@bookMeetingCity"
+                       OnSubmit="@(result => OnBookMeetingSubmit(result))"
+                       OnCancel="@(result => OnBookMeetingCancel(result))" />
+}
+@code {
+    private string prompt = string.Empty;
+    private IConfigurationRoot? config;
+    private IMcpClient? mcpClient;
+    IChatClient? chatClient;
+    private ChatOptions? chatOptions;
+    IList<Microsoft.Extensions.AI.ChatMessage> chatHistory = [
+            new(ChatRole.System, @"You are a helpful assistant, delivering answer including the user's login ID as prefix of the response."),
+    ];
+    private string results = string.Empty;
+    private TimeResultDto? timeResult;
+
+    // BookMeetingDialog state
+    private bool showBookMeetingDialog = false;
+    private DateTime bookMeetingDateTime;
+    private string bookMeetingAgenda = string.Empty;
+    private string bookMeetingCity = string.Empty;
+    private string bookMeetingResult = string.Empty;
+
+    protected override async Task OnInitializedAsync() {
+        config = new ConfigurationBuilder()
+            .AddJsonFile("./appsettings.json")
+            .Build();
+
+        // Create MCP Client with connection to MCP server
+        SseClientTransport sseClientTransport = new SseClientTransport(
+            new SseClientTransportOptions() {
+                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "https://localhost")
+                },
+            Http
+        );
+        mcpClient = await McpClientFactory.CreateAsync(sseClientTransport);
+        await JS.InvokeVoidAsync("console.log", "MCP Client successfully connected!");
+
+        // List all tools in MCP server and convert to function calling
+        await JS.InvokeVoidAsync("console.log", "MCP Tools available:");
+        IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
+        foreach (McpClientTool tool in mcpTools) {
+            await JS.InvokeVoidAsync("console.log", $"{tool.Name} ({tool.Description})");
+        }
+        // MCP tools + local function calling
+        chatOptions = new ChatOptions() {
+            Tools = [.. mcpTools, AIFunctionFactory.Create(ShowBookMeeting, "ShowBookMeeting", "book an urgent meeting in the city, datetime and agenda")]
+        };
+        await JS.InvokeVoidAsync("console.log", "Function calling available:");
+        foreach (AITool tool in chatOptions.Tools) {
+            await JS.InvokeVoidAsync("console.log", $"{tool.Name} ({tool.Description})");
+        }
+        // Create chat client with Azure OpenAI
+        AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential(config["LLM:Azure_API_Key"] ?? "");
+        Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
+        chatClient = new ChatClientBuilder(
+            new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
+            .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
+        .UseFunctionInvocation()
+        .Build();
+        await JS.InvokeVoidAsync("console.log", "Chat Client successfully created!");
+    }
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(prompt))
+        {
+            chatHistory.Add(new ChatMessage(ChatRole.User, prompt));
+            prompt = string.Empty;
+            if (chatClient != null && chatOptions != null)
+            {
+                ChatResponse response = await chatClient.GetResponseAsync(chatHistory, chatOptions);
+                string content = response.ToString();
+                results += $"Assistant> {content}\n";
+                chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+            }
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task CallApi()
+    {
+        timeResult = await Http.GetFromJsonAsync<TimeResultDto>(config["LLM:API_ENDPOINT"] ?? "https://localhost");
+        await JS.InvokeVoidAsync("console.log", timeResult);
+    }
+
+    private async Task CallMcp()
+    {
+        CallToolResult result = await mcpClient.CallToolAsync("GetCurrentTime",
+            new Dictionary<string, object?>() { ["city"] = "New York" });
+        await JS.InvokeVoidAsync("console.log", result.Content.First(c => c.Type == "text").ToAIContent());
+    }
+
+    private TaskCompletionSource<string>? bookMeetingTcs;
+
+    private async Task<string> ShowBookMeeting(string city, DateTime meetingDateTime, string agenda) {
+        bookMeetingDateTime = meetingDateTime;
+        bookMeetingAgenda = agenda;
+        bookMeetingCity = city;
+        showBookMeetingDialog = true;
+        bookMeetingTcs = new TaskCompletionSource<string>(bookMeetingResult);
+        StateHasChanged();
+        return await bookMeetingTcs.Task;
+    }
+
+    private void OnBookMeetingSubmit(string result) {
+        showBookMeetingDialog = false;
+        bookMeetingResult = result;
+        bookMeetingTcs?.TrySetResult(result);
+        StateHasChanged();
+    }
+
+    private void OnBookMeetingCancel(string result) {
+        showBookMeetingDialog = false;
+        bookMeetingResult = result;
+        bookMeetingTcs?.TrySetResult(result);
+        StateHasChanged();
+    }
+
+    public class TimeResultDto {
+        public string? Name { get; set; }
+        public DateTime CTime { get; set; }
+    }
+}
+

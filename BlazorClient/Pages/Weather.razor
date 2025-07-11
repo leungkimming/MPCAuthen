@@ -1,0 +1,198 @@
+﻿@page "/weather"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@using Azure;
+@using Azure.AI.OpenAI;
+@using Microsoft.Extensions.AI;
+@using Microsoft.Extensions.Configuration;
+@using ModelContextProtocol;
+@using ModelContextProtocol.Client;
+@using ModelContextProtocol.Protocol;
+
+<PageTitle>Weather</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+@if (results == null) {
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+                <th aria-label="Temperature in Farenheit">Temp. (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+@*             @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                </tr>
+            } *@
+        </tbody>
+    </table>
+    <div class="mt-4">
+        <label for="results">Results:</label>
+        <textarea id="results" class="form-control" @bind="results" rows="13"></textarea>
+    </div>
+}
+
+@if (showBookMeetingDialog)
+{
+    <BookMeetingDialog DateParam="@bookMeetingDateTime"
+                       AgendaParam="@bookMeetingAgenda"
+                       City="@bookMeetingCity"
+                       OnSubmit="@(result => OnBookMeetingSubmit(result))"
+                       OnCancel="@(result => OnBookMeetingCancel(result))" />
+}
+
+@code {
+    private WeatherForecast[]? forecasts;
+    private IConfigurationRoot? config;
+    private IMcpClient? mcpClient;
+    private string results = string.Empty;
+    private TimeResultDto? timeResult;
+
+    // BookMeetingDialog state
+    private bool showBookMeetingDialog = false;
+    private DateTime bookMeetingDateTime;
+    private string bookMeetingAgenda = string.Empty;
+    private string bookMeetingCity = string.Empty;
+    private string bookMeetingResult = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        //forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("sample-data/weather.json");
+
+        config = new ConfigurationBuilder()
+            .AddJsonFile("./appsettings.json")
+            .Build();
+
+        // Use the client to call the /Time API
+        //timeResult = await Http.GetFromJsonAsync<TimeResultDto>("https://localhost:44322/Time");
+
+        SseClientTransport sseClientTransport = new SseClientTransport(
+            new SseClientTransportOptions() {
+                Endpoint = new Uri("https://localhost:44322/sse")
+            },
+            Http
+        );
+        mcpClient = await McpClientFactory.CreateAsync(sseClientTransport);
+
+        results += "Successfully connected!\n";
+        results += "---------------------------------\n";
+
+        // Get all available tools
+        results += "Tools available:\n";
+        IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
+        foreach (McpClientTool tool in tools) {
+            results += $"{tool.Name} ({tool.Description})\n";
+        }
+        results += "---------------------------------\n";
+
+        // Execute a tool directly.
+        results += "Use tool directly in McpClient:\n";
+        CallToolResult result = await mcpClient.CallToolAsync(
+            "GetCurrentTime",
+            new Dictionary<string, object?>() { ["city"] = "New York" });
+        results += result.Content.First(c => c.Type == "text").ToAIContent() + "\n";
+        results += "---------------------------------\n";
+
+        // Driven by LLM tool invocations.
+        results += "Use tool in ChatClient:\n";
+        AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential(config["LLM:Azure_API_Key"] ?? "");
+        Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
+        IChatClient chatClient = new ChatClientBuilder(
+            new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
+            .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
+        .UseFunctionInvocation()
+        .Build();
+
+        IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =
+        [
+            new(ChatRole.System, @"
+You are a helpful assistant, delivering answer including the user's login ID as prefix of the response."),
+];
+        // Core Part: Get AI Tools from MCP Server
+        IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
+
+        // Add the local tool to the tools list
+        var allTools = mcpTools.ToList();
+        ChatOptions chatOptions = new ChatOptions() {
+            Tools = [.. mcpTools, AIFunctionFactory.Create(ShowBookMeeting, "ShowBookMeeting", "book an urgent meeting in the city, datetime and agenda")]
+        };
+
+        // Prompt the user for a question.
+        results += $"Assistant> How can I assist you today? ('exit' to quit)\n";
+
+        // Read the user question.
+        string question = "What is the time in Melbourne";
+
+        chatHistory.Add(new ChatMessage(ChatRole.User, question));
+        ChatResponse response = await chatClient.GetResponseAsync(chatHistory, chatOptions);
+        string content = response.ToString();
+        results += $"Assistant> {content}\n";
+        chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+
+        question = "Book an urgent meeting in 15 minutes about our tax reform";
+
+        chatHistory.Add(new ChatMessage(ChatRole.User, question));
+        response = await chatClient.GetResponseAsync(chatHistory, chatOptions);
+        content = response.ToString();
+        results += $"Assistant> {content}\n";
+        chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+    }
+
+    private TaskCompletionSource<string>? bookMeetingTcs;
+
+    private async Task<string> ShowBookMeeting(string city, DateTime meetingDateTime, string agenda) {
+        bookMeetingDateTime = meetingDateTime;
+        bookMeetingAgenda = agenda;
+        bookMeetingCity = city;
+        showBookMeetingDialog = true;
+        bookMeetingTcs = new TaskCompletionSource<string>(bookMeetingResult);
+        StateHasChanged();
+        return await bookMeetingTcs.Task;
+    }
+
+    private void OnBookMeetingSubmit(string result)
+    {
+        showBookMeetingDialog = false;
+        bookMeetingResult = result;
+        bookMeetingTcs?.TrySetResult(result);
+        StateHasChanged();
+    }
+
+    private void OnBookMeetingCancel(string result) {
+        showBookMeetingDialog = false;
+        bookMeetingResult = result;
+        bookMeetingTcs?.TrySetResult(result);
+        StateHasChanged();
+    }
+
+    public class WeatherForecast
+    {
+        public DateOnly Date { get; set; }
+
+        public int TemperatureC { get; set; }
+
+        public string? Summary { get; set; }
+
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    }
+    public class TimeResultDto {
+        public string? Name { get; set; }
+        public DateTime CTime { get; set; }
+    }
+}

@@ -1,0 +1,35 @@
+@inject NavigationManager NavigationManager
+@page "/BookMeeting"
+
+<PageTitle>Book Meeting</PageTitle>
+
+<h3>Book a Meeting</h3>
+
+<BookMeetingDialog DateParam="@DateTime.Now"
+                   AgendaParam=""
+                   City=""
+                   OnSubmit="OnSubmit"
+                   OnCancel="OnCancel" />
+
+@if (!string.IsNullOrEmpty(resultMessage))
+{
+    <div class="alert alert-info mt-3">@resultMessage</div>
+}
+
+@code {
+    private string resultMessage = string.Empty;
+
+    private void OnSubmit(string message)
+    {
+        resultMessage = message;
+        StateHasChanged();
+        NavigationManager.NavigateTo("/");
+    }
+
+    private void OnCancel(string message)
+    {
+        resultMessage = message;
+        StateHasChanged();
+        NavigationManager.NavigateTo("/");
+    }
+}

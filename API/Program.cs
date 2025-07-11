@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add CORS for React Client
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowLocal3000", policy => {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins("http://localhost:3000", "https://localhost:44328")
               .AllowCredentials()
               .AllowAnyHeader()
               .AllowAnyMethod();

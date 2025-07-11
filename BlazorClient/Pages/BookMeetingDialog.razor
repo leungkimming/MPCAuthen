@@ -1,0 +1,78 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="modal-overlay">
+    <div class="modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Book Meeting</h5>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label>Date:</label>
+                    <MudDatePicker @bind-Date="meetingDate" DateFormat="dd/MM/yyyy" />
+                </div>
+                <div class="mb-3">
+                    <label>Time:</label>
+                    <MudTimePicker @bind-Time="meetingTime" TimeFormat="HH:mm" />
+                </div>
+                <div class="mb-3">
+                    <label>Agenda:</label>
+                    <input type="text" class="form-control" @bind="agenda" />
+                </div>
+                <div class="mb-3">
+                    <label>City:</label>
+                    <input type="text" class="form-control" @bind="city" />
+                </div>
+                <div class="mb-3">
+                    <label>Participants:</label>
+                    <input type="text" class="form-control" @bind="participants" placeholder="Enter participants" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" @onclick="Submit" disabled="@(!IsFormValid)">Submit</button>
+                <button class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public DateTime DateParam { get; set; }
+    [Parameter] public string AgendaParam { get; set; } = string.Empty;
+    [Parameter] public string City { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnSubmit { get; set; }
+    [Parameter] public EventCallback<string> OnCancel { get; set; }
+
+    private DateTime? meetingDate;
+    private TimeSpan? meetingTime;
+    private string agenda = string.Empty;
+    private string city = string.Empty;
+    private string participants = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        meetingDate = DateParam.Date;
+        meetingTime = DateParam.TimeOfDay;
+        agenda = AgendaParam;
+        city = City;
+    }
+
+    private bool IsFormValid =>
+        meetingDate.HasValue &&
+        meetingTime.HasValue &&
+        !string.IsNullOrWhiteSpace(agenda) &&
+        !string.IsNullOrWhiteSpace(city) &&
+        !string.IsNullOrWhiteSpace(participants);
+
+    private async Task Submit()
+    {
+        if (OnSubmit.HasDelegate)
+            await OnSubmit.InvokeAsync($"Meeting Room R11 booked in {city} on {meetingDate:dd/MM/yyyy} at {meetingTime:hh\\:mm} with agenda: {agenda} and participants: {participants}.");
+    }
+
+    private async Task Cancel()
+    {
+        if (OnCancel.HasDelegate)
+            await OnCancel.InvokeAsync("Meeting booking cancelled by user.");
+    }
+}

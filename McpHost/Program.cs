@@ -35,7 +35,7 @@ switch (config["Transport"]?.ToUpper()) {
         HttpClient client = new HttpClient(handler);
         SseClientTransport sseClientTransport = new SseClientTransport(
             new SseClientTransportOptions() {
-                Endpoint = new Uri("https://localhost:44322/sse")
+                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "https://localhost")
             },
             client
         );
@@ -68,7 +68,7 @@ Console.WriteLine("---------------------------------");
 // Driven by LLM tool invocations.
 Console.WriteLine("Use tool in ChatClient:");
 AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential(config["LLM:Azure_API_Key"] ?? "");
-Uri AzureEndpoint = new Uri(config["LLM:EndPoint"] ?? "");
+Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
 IChatClient chatClient = new ChatClientBuilder(
     new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
     .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
@@ -84,8 +84,13 @@ You are a helpful assistant, delivering answer including the user's login ID as 
 IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
 ChatOptions chatOptions = new ChatOptions()
 {
-    Tools = [..mcpTools]
+    Tools = [..mcpTools, AIFunctionFactory.Create(ShowBookMeeting, "ShowBookMeeting", "book an urgent meeting in the city, datetime and agenda")]
 };
+
+foreach (AITool tool in chatOptions.Tools)
+{
+    Console.WriteLine($"Tool: {tool.Name}, Description: {tool.Description}");
+}
 
 // Prompt the user for a question.
 Console.ForegroundColor = ConsoleColor.Green;
@@ -117,3 +122,13 @@ if (mcpClient is IAsyncDisposable asyncDisposable) {
     await asyncDisposable.DisposeAsync();
 }
 Environment.Exit(0);
+
+
+string ShowBookMeeting(string city, DateTime meetingDateTime, string agenda) {
+    var result = $"Meeting Room R1 booked in {city} at {meetingDateTime} with agenda: {agenda}";
+    Console.WriteLine($"local method 'ShowBookMeeting' called with result: {result}");
+    return result;
+}
+
+
+

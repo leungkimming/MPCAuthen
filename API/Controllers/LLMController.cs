@@ -18,6 +18,7 @@ namespace API.Controllers
         }
 
         [HttpPost]
+        [HttpPost("openai/deployments/gpt-4.1/chat/completions")]
         public async Task<IActionResult> Proxy()
         {
             var request = HttpContext.Request;
