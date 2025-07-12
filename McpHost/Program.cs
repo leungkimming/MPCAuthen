@@ -121,6 +121,20 @@ while (true)
     string content = response.ToString();
     Console.WriteLine($"Assistant> {content}");
     chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+    foreach (var message in response.Messages)
+    {
+        foreach (var mcontent in message.Contents) {
+            if (mcontent is FunctionCallContent functionCallContent)
+            {
+                OpenAI.Chat.ChatToolCall toolcall = functionCallContent.RawRepresentation as OpenAI.Chat.ChatToolCall;
+                Console.WriteLine($"Function call: {toolcall.FunctionName} parameter: {toolcall.FunctionArguments}");
+            }
+            else if (mcontent is FunctionResultContent functionResultContent)
+            {
+                Console.WriteLine($"Function call result: {functionResultContent.Result}");
+            }
+        }
+    }
 
     Console.WriteLine();
 }

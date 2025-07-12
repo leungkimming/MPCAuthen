@@ -24,10 +24,8 @@
     * Directly called 'GetCurrentTime' in MCP server passing 'New York' as parameter
     * It is a sentence for LLM to understand, containing login user (prove of authentication in MCP server), HK DateTime and instruction to adjust GMT for New York. (LLM know the GMT different between HK and New York)
 * Test 4: Send Prompt: 'What is the current time in Melbourne'
-    * For ReactJS Client only (because we manage function calling in code):
-        * Expand the console messages and notice the 'GetCurrentTime' MCP tool passed to LLM
-        * Expand the console messages and notice the LLM request tool call of 'GetCurrentTime' passing 'Melbourne'
-        * Notice the result of 'GetCurrentTime' MCP Tool passed back to LLM. The content is similiar to Test 3, except the city
+    * Notice the LLM request tool call of 'GetCurrentTime' passing 'Melbourne'
+    * Notice the result of 'GetCurrentTime' MCP Tool passed back to LLM. The content is similiar to Test 3, except the city
     * In the Chat area, notice LLM's reply after considering the result from 'GetCurrentTime' MCP Tool, including the authenticated user's name.
     * Notice the LLM Token used.
 * Test 5: LLM invoke Book Meeting dialog for user
