@@ -12,10 +12,10 @@ public class SseCredentialValidationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Intercept only /sse endpoint
+        // Intercept only /sse endpoint for required authorization validation
         if (context.Request.Path.Equals("/sse", System.StringComparison.OrdinalIgnoreCase))
         {
-            string name = context?.User?.Identity?.Name ?? "anonymous";
+            string name = context.User?.Identity?.Name ?? "anonymous";
             if (name == "anonymous")
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;

@@ -1,4 +1,5 @@
 ﻿@page "/"
+@page "/AIChat"
 @inject IJSRuntime JS
 @inject HttpClient Http
 @using Azure;
@@ -55,7 +56,7 @@
     IChatClient? chatClient;
     private ChatOptions? chatOptions;
     IList<Microsoft.Extensions.AI.ChatMessage> chatHistory = [
-            new(ChatRole.System, @"You are a helpful assistant, delivering answer including the user's login ID as prefix of the response."),
+            new(ChatRole.System, @"You are a helpful assistant, delivering short answers, including the user's login ID as prefix of the response."),
     ];
     private string results = string.Empty;
     private TimeResultDto? timeResult;
@@ -68,41 +69,49 @@
     private string bookMeetingResult = string.Empty;
 
     protected override async Task OnInitializedAsync() {
+        // Load MCP & LLM configuration and endpoints
         config = new ConfigurationBuilder()
             .AddJsonFile("./appsettings.json")
             .Build();
 
-        // Create MCP Client with connection to MCP server
+        // Create MCP Client with SSE connection to MCP server
         SseClientTransport sseClientTransport = new SseClientTransport(
             new SseClientTransportOptions() {
-                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "https://localhost")
+                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "")
                 },
             Http
         );
         mcpClient = await McpClientFactory.CreateAsync(sseClientTransport);
         await JS.InvokeVoidAsync("console.log", "MCP Client successfully connected!");
 
-        // List all tools in MCP server and convert to function calling
+        // List all tools in MCP server and convert to OpenAI function calling
         await JS.InvokeVoidAsync("console.log", "MCP Tools available:");
         IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
         foreach (McpClientTool tool in mcpTools) {
             await JS.InvokeVoidAsync("console.log", $"{tool.Name} ({tool.Description})");
         }
-        // MCP tools + local function calling
         chatOptions = new ChatOptions() {
-            Tools = [.. mcpTools, AIFunctionFactory.Create(ShowBookMeeting, "ShowBookMeeting", "book an urgent meeting in the city, datetime and agenda")]
+            Tools = [.. mcpTools]
         };
+
+        // Add a local function for booking meetings
+        var localFunction = AIFunctionFactory.Create(
+            ShowBookMeeting, "BookMeeting", "book a meeting in the city, datetime and agenda");
+        chatOptions.Tools.Add(localFunction);
+
+        // Log available tools for function calling
         await JS.InvokeVoidAsync("console.log", "Function calling available:");
         foreach (AITool tool in chatOptions.Tools) {
             await JS.InvokeVoidAsync("console.log", $"{tool.Name} ({tool.Description})");
         }
-        // Create chat client with Azure OpenAI
+
+        // Create chat client with Azure OpenAI. Endpoint is a proxy API endpoint. Proxy will provide true API Key. API Key here is dummy.
         AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential(config["LLM:Azure_API_Key"] ?? "");
         Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
         chatClient = new ChatClientBuilder(
             new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
             .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
-        .UseFunctionInvocation()
+        .UseFunctionInvocation() // LLM will call functions when needed
         .Build();
         await JS.InvokeVoidAsync("console.log", "Chat Client successfully created!");
     }
@@ -133,13 +142,13 @@
 
     private async Task CallApi()
     {
-        timeResult = await Http.GetFromJsonAsync<TimeResultDto>(config["LLM:API_ENDPOINT"] ?? "https://localhost");
+        timeResult = await Http.GetFromJsonAsync<TimeResultDto>(config?["LLM:API_ENDPOINT"] ?? "");
         await JS.InvokeVoidAsync("console.log", timeResult);
     }
 
     private async Task CallMcp()
     {
-        CallToolResult result = await mcpClient.CallToolAsync("GetCurrentTime",
+        CallToolResult result = await mcpClient!.CallToolAsync("GetCurrentTime",
             new Dictionary<string, object?>() { ["city"] = "New York" });
         await JS.InvokeVoidAsync("console.log", result.Content.First(c => c.Type == "text").ToAIContent());
     }

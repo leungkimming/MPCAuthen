@@ -48,7 +48,7 @@ const BookUrgentMeeting: React.FC<BookUrgentMeetingProps> = ({ onComplete, jsonP
     if (dateTime && city) {
       const dateStr = dateTime.toLocaleDateString('en-GB');
       const timeStr = dateTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      resultMsg = `urgent meeting booked for ${city} on ${dateStr} at ${timeStr}`;
+      resultMsg = `urgent meeting booked for ${city} on ${dateStr} at ${timeStr} in Room 11`;
       setResult(resultMsg);
     }
     if (onComplete) onComplete({ city, DateTime: dateTime ? dateTime.toISOString() : '', description, participants, result: resultMsg });

@@ -14,12 +14,13 @@ function App() {
   const mcpClientRef_1 = useRef<any>(null); // For testing multiple MCP client reference
   const LLMClientRef = useRef<LLMClient | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'system', content: "You are a helpful assistant, delivering answer including the user's login ID as prefix of the response." }
+    { role: 'system', content: "You are a helpful assistant, delivering short answer, including the user's login ID as prefix of the response." }
   ]);
   const [showBookMeetingDialog, setShowBookMeetingDialog] = useState(false);
   const [bookMeetingParams, setBookMeetingParams] = useState<{jsonParam?: string}>({});
   const bookMeetingPromiseRef = useRef<((result: any) => void) | null>(null);
 
+  // Create MCP Client with SSE connection to MCP server
   useEffect(() => {
     (async () => {
       try {
@@ -43,7 +44,7 @@ function App() {
   }, []);
   // Initialize more MCP clients as needed
 
-  // Fetch LLM endpoint from environment variable and initialize LLMClientRef
+  // Create an LLM client and add initial messages, mcp tools and local function call
   useEffect(() => {
     if (!mcpClientRef.current) {
       console.log('MCP client is not yet initialized');
@@ -51,10 +52,11 @@ function App() {
     }
     const endpoint = process.env.REACT_APP_LLM_PROXY_ENDPOINT;
     if (endpoint) {
-      LLMClientRef.current = createLLMClient(endpoint);
+      LLMClientRef.current = createLLMClient(endpoint); // a LLM Proxy API. API Key to be provided by API
       LLMClientRef.current.addMessage(chatMessages[0]);
       LLMClientRef.current.addMCPClient(mcpClientRef.current);
-      const initialTool = {
+      // descriptions are critical for LLM to understand when and how to use the local function call tool
+      const bookMeetingTool = {
         type: 'function',
         function: {
           name: 'navigate2bookmeetings',
@@ -70,17 +72,19 @@ function App() {
           }
         }
       };
-      LLMClientRef.current.addTools(initialTool);
+      LLMClientRef.current.addTools(bookMeetingTool);
     } else {
       console.error('REACT_APP_LLM_PROXY_ENDPOINT is not set in .env');
     }
   }, [mcpClientRef.current]);
 
+  // Demo direct call API
   const handleCallAPI = async (e: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     console.log('[MCP] Calling API Controller Time...');
+    const endpoint = process.env.REACT_APP_API_ENDPOINT || '';
     try {
-      const response = await fetch('https://localhost:44322/Time', {
+      const response = await fetch(endpoint, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -96,6 +100,7 @@ function App() {
     }
   };
 
+  // Demo direct call MCP tool
   const handleCallMCP = async () => {
     console.log('[MCP] Calling Direct Tool GetCurrentTime for New York...');
     const client = mcpClientRef.current;
@@ -112,7 +117,7 @@ function App() {
     }
   };
 
-  
+  // Post user prompt to LLM and handle function calls
   const handleCallLLM = async () => {
     console.log('[LLM] Calling LLM...');
     const client = LLMClientRef.current;
@@ -127,7 +132,7 @@ function App() {
     }
     setChatMessages((prev) => [...prev, userMsg]);
     setPrompt('');
-    // Track message count before LLM call
+    // Call LLM with function calling handler
     try {
       const llmOutput = await ChatWithFunctionCalls({
         llmClient: client,

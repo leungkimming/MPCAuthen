@@ -1,23 +1,29 @@
-﻿using ModelContextProtocol.Server;
+﻿using Common;
+using Microsoft.Extensions.Configuration;
+using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
-using Common;
 
 namespace McpServer.Tools.ConsoleHost;
 
+// Annotations '[...]' is critical for LLM to understand when and how to use this tool.
 [McpServerToolType]
 public static class TimeTool
 {
     [McpServerTool, Description("Get the current time for a city")]
-    public static string GetCurrentTime(string city)
+    public static string GetCurrentTime([Description("The city to get the local time for")] string city)
     {
+        var config = new ConfigurationBuilder()
+            .AddJsonFile($"appsettings.json")
+            .Build();
         // Create handler with default credentials
         var handler = new HttpClientHandler
         {
             UseDefaultCredentials = true
         };
         using var client = new HttpClient(handler);
-        var response = client.GetAsync($"https://localhost:44322/Time").GetAwaiter().GetResult();
+        // Call the API endpoint to get the current time
+        var response = client.GetAsync(config["LLM:API_ENDPOINT"]).GetAwaiter().GetResult();
         string result;
         if (response.IsSuccessStatusCode)
         {
@@ -26,7 +32,9 @@ public static class TimeTool
             {
                 PropertyNameCaseInsensitive = true
             };
-            var data = JsonSerializer.Deserialize<TimeResultDto>(json, options);            result = $"Hi {data?.Name}, it is {data?.CTime.Hour}:{data?.CTime.Minute} on {data?.CTime:dd/MM/yyyy} in Hong Kong, which is GMT +8. You have to adjust to {city}'s GMT offset before answering.";
+            var data = JsonSerializer.Deserialize<TimeResultDto>(json, options);
+            // MCP return INFORMATION with INSTRUCTIONS, while API returns DTO
+            result = $"Hi {data?.Name}, the current local time in Hong Kong is {data?.CTime:HH:mm} on {data?.CTime:dd/MM/yyyy} (GMT+8). To provide the local time for {city}, please convert this time from GMT+8 to the GMT offset of {city} before answering.";
         }
         else
         {

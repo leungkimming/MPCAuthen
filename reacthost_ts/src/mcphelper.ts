@@ -29,6 +29,7 @@ export class LLMClient {
   private Tools: any[] = [];
   private McpClients: any[] = [];
   constructor(endpoint: string) {
+    // endpoint is a LLM Proxy API. API Key to be provided by API
     this.client = ModelClient(endpoint, new AzureKeyCredential("DummyKey"));
   }
   public addMessage(msg: ChatMessage) {
@@ -54,6 +55,7 @@ export class LLMClient {
   }
 }
 
+// Create MCP Client with SSE connection to MCP server
 export async function createMCPClient(sseUrl: string) {
   const transport = new SSEClientTransport(new URL(sseUrl), {
     eventSourceInit: { withCredentials: true },
@@ -139,10 +141,12 @@ export async function ChatWithFunctionCalls({
     if (responseBody && Array.isArray(responseBody.choices)) {
       for (const choice of responseBody.choices) {
         const toolCallArray = choice.message?.tool_calls;
+        // handle tool calls if they exist
         if (toolCallArray) {
           choice.message.role = 'assistant';
           llmClient.addMessage(choice.message);
           const functionArray: any[] = [];
+          // Tool calls may be muliple
           for (const toolCall of toolCallArray) {
             console.log('DEBUG LLM request ToolCall:', toolCall);
             functionArray.push({
@@ -151,6 +155,7 @@ export async function ChatWithFunctionCalls({
               id: toolCall.id
             });
           }
+          // handle all tool calls and add results to LLM client ChatMessage
           const toolMessages = await handleToolCalls(functionArray, toolNameToClient);
           for (const toolMsg of toolMessages) {
             console.log('[ToolCall Result passed back to LLM]', toolMsg.content);
@@ -158,8 +163,8 @@ export async function ChatWithFunctionCalls({
           }
         }
         if (choice.finish_reason === 'tool_calls') {
-          continue;
-        } else {
+          continue; // Loop until all tool calls are processed
+        } else { // No more tool calls, process the LLM output
           if (choice.message?.content && choice.message.content !== '') {
             llmOutput += choice.message.content;
             awaitingToolCallAnswer = false;
@@ -168,10 +173,11 @@ export async function ChatWithFunctionCalls({
         }
       }
     } else {
-      awaitingToolCallAnswer = false;
+      awaitingToolCallAnswer = false; // No tool calls or choices, exit the loop
     }
   }
   if (llmOutput) {
+    // Add the final LLM output to the client messages
     llmClient.addMessage({ role: 'assistant', content: llmOutput });
   }
   return llmOutput;
@@ -190,6 +196,7 @@ export async function handleToolCalls(
   for (const func of functionArray) {
     let content = '';
     const mcpClient = toolNameToClient[func.name];
+    // Check if it's an MCP tool call
     if (mcpClient) {
       try {
         const args = JSON.parse(func.arguments);
@@ -199,7 +206,7 @@ export async function handleToolCalls(
         content = `[MCP] MCP Error: ${getErrorMessage(err)}`;
       }
     } else {
-      // Check if it's a local TypeScript function
+      // else, check if it is a local TypeScript function
       if (typeof (globalThis as any)[func.name] === 'function') {
         try {
           const args = JSON.parse(func.arguments);
@@ -213,6 +220,7 @@ export async function handleToolCalls(
         content = `[MCP] MCP client / local function not found for tool: ${func.name}`;
       }
     }
+    // Add the tool call result to the message array
     messageArray.push({
       role: 'tool',
       content,
@@ -237,6 +245,7 @@ export async function connectMCP(url: string): Promise<any> {
     const client = await createMCPClient(url);
     console.log('[MCP] Connected');
     const toolsResult = await listMCPTools(client);
+    // Log the available tools
     try {
       if (toolsResult.tools.length === 0) {
         console.log('[MCP] No tools available');

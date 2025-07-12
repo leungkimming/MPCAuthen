@@ -6,11 +6,12 @@ using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
+// Load MCP & LLM configuration and endpoints
 var config = new ConfigurationBuilder()
     .AddJsonFile($"appsettings.json")
     .Build();
 
-// Connect to an MCP server
+// Connect to an MCP server. Use STDIO or SSE depends on configuration
 Console.WriteLine("Now connecting client to MCP server");
 IMcpClient mcpClient;
 
@@ -35,7 +36,7 @@ switch (config["Transport"]?.ToUpper()) {
         HttpClient client = new HttpClient(handler);
         SseClientTransport sseClientTransport = new SseClientTransport(
             new SseClientTransportOptions() {
-                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "https://localhost")
+                Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "")
             },
             client
         );
@@ -48,7 +49,7 @@ switch (config["Transport"]?.ToUpper()) {
 Console.WriteLine("Successfully connected!");
 Console.WriteLine("---------------------------------");
 
-// Get all available tools
+// Get all available MCP tools
 Console.WriteLine("Tools available:");
 IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
 foreach (McpClientTool tool in tools)
@@ -57,7 +58,7 @@ foreach (McpClientTool tool in tools)
 }
 Console.WriteLine("---------------------------------");
 
-// Execute a tool directly.
+// Demo execute MCP tool directly.
 Console.WriteLine("Use tool directly in McpClient:");
 CallToolResult result = await mcpClient.CallToolAsync(
     "GetCurrentTime",
@@ -65,28 +66,35 @@ CallToolResult result = await mcpClient.CallToolAsync(
 Console.WriteLine(result.Content.First(c => c.Type == "text").ToAIContent());
 Console.WriteLine("---------------------------------");
 
-// Driven by LLM tool invocations.
+// Create chat client with Azure OpenAI. Endpoint is a proxy API endpoint. Proxy will provide true API Key. API Key here is dummy.
 Console.WriteLine("Use tool in ChatClient:");
 AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential(config["LLM:Azure_API_Key"] ?? "");
 Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
 IChatClient chatClient = new ChatClientBuilder(
     new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
     .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
-.UseFunctionInvocation()
+.UseFunctionInvocation() // LLM will call functions when needed
 .Build();
 
 IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =
 [
     new(ChatRole.System, @"
-You are a helpful assistant, delivering answer including the user's login ID as prefix of the response."),
+You are a helpful assistant, delivering short answer, including the user's login ID as prefix of the response."),
 ];
-// Core Part: Get AI Tools from MCP Server
+
+// Convert MPC tools to OpenAI function calling
 IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync();
 ChatOptions chatOptions = new ChatOptions()
 {
-    Tools = [..mcpTools, AIFunctionFactory.Create(ShowBookMeeting, "ShowBookMeeting", "book an urgent meeting in the city, datetime and agenda")]
+    Tools = [..mcpTools]
 };
 
+// Add a local function for booking meetings
+var localFunction = AIFunctionFactory.Create(
+    ShowBookMeeting, "BookMeeting", "book a meeting in the city, datetime and agenda");
+chatOptions.Tools.Add(localFunction);
+
+// List all function calling tools
 foreach (AITool tool in chatOptions.Tools)
 {
     Console.WriteLine($"Tool: {tool.Name}, Description: {tool.Description}");
@@ -101,7 +109,7 @@ while (true)
     // Read the user question.
     Console.ForegroundColor = ConsoleColor.White;
     Console.Write("User> ");
-    string question = Console.ReadLine();
+    string? question = Console.ReadLine();
 
     // Exit the application if the user didn't type anything.
     if (!string.IsNullOrWhiteSpace(question) && question.ToUpper() == "EXIT")
@@ -123,7 +131,7 @@ if (mcpClient is IAsyncDisposable asyncDisposable) {
 }
 Environment.Exit(0);
 
-
+// A Demo local function to simulate the meeting booking function for LLM to call
 string ShowBookMeeting(string city, DateTime meetingDateTime, string agenda) {
     var result = $"Meeting Room R1 booked in {city} at {meetingDateTime} with agenda: {agenda}";
     Console.WriteLine($"local method 'ShowBookMeeting' called with result: {result}");
