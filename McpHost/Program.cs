@@ -73,7 +73,7 @@ Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
 IChatClient chatClient = new ChatClientBuilder(
     new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
     .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
-.UseFunctionInvocation() // LLM will call functions when needed
+.UseFunctionInvocation() // LLM will call functions automatically with coding
 .Build();
 
 IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =

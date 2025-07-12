@@ -13,7 +13,10 @@
 <PageTitle>AI Chat</PageTitle>
 
 <h1>AI Chat</h1>
-
+<div style="margin-bottom:1rem;">
+    <label style="font-weight:bold;">MCP Status:</label>
+    <span>@MCPStatus</span>
+</div>
 <div class="chat-app-container">
     <div class="chat-history" id="chatHistory">
         @foreach (var message in chatHistory)
@@ -60,7 +63,7 @@
     ];
     private string results = string.Empty;
     private TimeResultDto? timeResult;
-
+    private string MCPStatus { get; set; } = "Not Connected";
     // BookMeetingDialog state
     private bool showBookMeetingDialog = false;
     private DateTime bookMeetingDateTime;
@@ -83,6 +86,7 @@
         );
         mcpClient = await McpClientFactory.CreateAsync(sseClientTransport);
         await JS.InvokeVoidAsync("console.log", "MCP Client successfully connected!");
+        MCPStatus = "Connected";
 
         // List all tools in MCP server and convert to OpenAI function calling
         await JS.InvokeVoidAsync("console.log", "MCP Tools available:");
@@ -111,7 +115,7 @@
         chatClient = new ChatClientBuilder(
             new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
             .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
-        .UseFunctionInvocation() // LLM will call functions when needed
+        .UseFunctionInvocation() // LLM will call functions automatically with coding
         .Build();
         await JS.InvokeVoidAsync("console.log", "Chat Client successfully created!");
     }
@@ -128,6 +132,7 @@
                 string content = response.ToString();
                 results += $"Assistant> {content}\n";
                 chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+                await JS.InvokeVoidAsync("console.log", $"Total Token used: {response.Usage.TotalTokenCount}");
             }
         }
     }

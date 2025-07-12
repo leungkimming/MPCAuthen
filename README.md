@@ -1,40 +1,42 @@
 # Quick start
-* API server
+## Common Step
+* Clone the repository to your local folder
+* First, start the API Project (containing API, LLM Proxy and MCP)
     * Replace Azure_API_key in API\appsettings.json
-    * Debug Run API using IIS Express (required AD authentication)
-* reacthost_ts
+    * Debug Run API using IIS Express (because IIS Express support Windows authentication)
+## To test ReactJS Client
+* DOS prompt cd to reacthost_ts folder
     * run 'npm install'
     * Copy .env.example to .env in reacthost_ts
     * Run 'npm start'
     * React Chat UI will open in default browse. To see all debug messages, press [F12] in web browser
-        * Test 1: 
-            * Notice that MCP Server Connection Status: Connected
-            * MCP Server in API project connected with 1 Tool 'GetCurrentTime' listed
-        * Test 2: Click the 'Call API' button.
-            * Traditional API in Controller called
-            * TimeResultDto returned with login user (prove of authentication) and DateTime
-        * Test 3: Click the 'Call the MCP' button.
-            * Directly called 'GetCurrentTime' in MCP server passing 'New York' as parameter
-            * It is a sentence for LLM to understand, containing login user (prove of authentication in MCP server), HK DateTime and instruction to adjust GMT for New York. (LLM know the GMT different between HK and New York)
-        * Test 4: Prompt: 'What is the current time in Melbourne' and press the 'Call LLM' button
-            * Expand the console messages and notice the 'GetCurrentTime' MCP tool passed to LLM
-            * Expand the console messages and notice the LLM request tool call of 'GetCurrentTime' passing 'Melbourne'
-            * Notice the result of 'GetCurrentTime' MCP Tool passed back to LLM. The content is similiar to Test 3, except the city
-            * Notice the LLM Token used.
-            * In the Chat area, notice LLM's reply after considering the result from 'GetCurrentTime' MCP Tool, including the authenticated user's name.
-        * Test 5: LLM invoke App dialog for user
-            * Prmmpt: 'What is the time in New York?'
-            * Prompt: 'Then, book an urgent meeting for me in 15 minutes'
-            * Dialog shown with City and DateTime. Input Description & Participants and press 'Book Meeting' (or just cancel)
-            * Note LLM's reply message.
-            * To invoke the 'Book urgent meeting' function like traditional Apps, click the 'Book Urgent Meeting' at the top.
-        * Test 6: Shutdown MCP Server
-            * Stop the API debug run
-            * Refresh the Chat UI in the browser
-            * Notice MCP Server Connection Status: Error
-            * Notice the Error connecting: SSE error: Failed to fetch 
-            * Notice NO tool passed to LLM
-            * Notice the answer in the Chat area - DateTime unknown.
+## To test Blazor Client
+* Debug run the BlazorClient Project
+## Test case
+* Press [F12] to view console log
+* Test 1: 
+    * Notice that MCP Server Connection Status: Connected
+    * MCP Server in API project connected with 1 MCP Tool 'GetCurrentTime' listed
+* Test 2: Click the 'Call API' button.
+    * Traditional API in Controller called
+    * TimeResultDto returned with login user (prove of authentication) and DateTime
+* Test 3: Click the 'Call the MCP' button.
+    * Directly called 'GetCurrentTime' in MCP server passing 'New York' as parameter
+    * It is a sentence for LLM to understand, containing login user (prove of authentication in MCP server), HK DateTime and instruction to adjust GMT for New York. (LLM know the GMT different between HK and New York)
+* Test 4: Send Prompt: 'What is the current time in Melbourne'
+    * For ReactJS Client only (because we manage function calling in code):
+        * Expand the console messages and notice the 'GetCurrentTime' MCP tool passed to LLM
+        * Expand the console messages and notice the LLM request tool call of 'GetCurrentTime' passing 'Melbourne'
+        * Notice the result of 'GetCurrentTime' MCP Tool passed back to LLM. The content is similiar to Test 3, except the city
+    * In the Chat area, notice LLM's reply after considering the result from 'GetCurrentTime' MCP Tool, including the authenticated user's name.
+    * Notice the LLM Token used.
+* Test 5: LLM invoke Book Meeting dialog for user
+    * Send Prmmpt: 'What is the time in New York?'
+    * Send Prompt: 'Then, book an urgent meeting for me in 15 minutes for salary matters'
+    * Dialog shown with City, description and DateTime. Input Participants and press 'Book Meeting' (or just cancel)
+    * Note LLM's reply message.
+    * You can also try to invoke the Book meeting dialog like traditional Apps. It is using the same dialog in both cases.
+
 # Design
 ![MCP Architecture](images/mcp.png)
 * McpHost is the main App. Can be Console, thick client or Browser Sandbox
@@ -43,7 +45,11 @@
             * Communicate with In-process MCP server via STDIO
         * MCP client with SseClientTransport for Server-Sent Events (SSE) transport
             * Communicate with external MCP server via HTTPS
+* McpServer.ConsoleHost
+    * For STDIO ClientTransport Protocol communication with MCP Servers.
+    * Used by McpHost above in 'STDIO' option only.
 * API is a normal external application
+    * Including the Service and Common projects
     * Traditional API controller:
         * For traditional UI presentation logic to call
         * Present data in DTO format for UI Client to process
@@ -61,6 +67,11 @@
     * Response to LLM Proxy Response's Tool Call, call the tool and add tool's response to the Chat Messages
     * Loop back to the LLM endpoint until no more tool call requests from LLM
     * Display LLM's final content in the Chat area
+* BlazorApp is a Blazor wasm MCP Host
+    * It is a Chat App with MCP Servers registered
+    * Post user's prompt to LLM via the LLM Proxy API, with Tools collected from all MCP Servers
+    * Response to LLM Proxy Response's Tool Call, call the tool and add tool's response to the Chat Messages
+    * Display LLM's final content in the Chat area
 ## STDIO
 * MCP clients create McpServer.ConsoleHost in-process
 * McpServer.ConsoleHosts use HTTPClient to call external application's API controller
@@ -68,13 +79,13 @@
 * MCP Clients call external MCP Servers exposed by traditional applications
 * External MCP Servers directly call traditional application's service layer
 # CORS settings
-* Required for React UI in Browser Sandbox
+* Required for React UI & Blazor wasm in Browser Sandbox
 * Redirect from "http://<App Server>:<port>" hosting the React UI App
 * In App/programs.cs
 ```
 builder.Services.AddCors(options => {
     options.AddPolicy("AllowLocal3000", policy => {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins("http://localhost:3000", "https://localhost:44328")
               .AllowCredentials()
               .AllowAnyHeader()
               .AllowAnyMethod();
@@ -91,7 +102,7 @@ app.UseCors("AllowLocal3000");
 ## SSE
 * MCP Client's SseClientTransport (latest version) can use normal HTTPClient with UseDefaultCredentials handler to call MCP Servers, passing credential
 * Implement authorization by individual external MCP Server tools
-# React UI 
+# React UI / Blazor wasm
 * CORS requires a pre-flight call to confirm the CORS header
 * This pre-flight will be blocked by IIS Express's windowsAuthentication requirement and failed.
 * Solution: Allow both windowsAuthentication and anonymousAuthentication in API project's launchSettings.json
@@ -140,6 +151,40 @@ CallToolResult result = await mcpClient.CallToolAsync(
     "GetCurrentTime",
     new Dictionary<string, object?>() { ["city"] = "New York" });
 ```
+### .NET Blazor
+* Blazor HttpClient does not support 'UseDefaultCredentials = true'
+* Need to custom CredentialsMessageHandler to include credential and enable response streaming.
+```
+public class CredentialsMessageHandler : DelegatingHandler {
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+        request.SetBrowserResponseStreamingEnabled(true);
+        return base.SendAsync(request, cancellationToken);
+    }
+}
+```
+* In program.cs
+```
+builder.Services.AddTransient<CredentialsMessageHandler>();
+builder.Services.AddScoped(sp =>
+    new HttpClient(
+        new CredentialsMessageHandler {
+            InnerHandler = new HttpClientHandler()
+        }
+    ) 
+);
+```
+* Then in page's code behind
+```
+@inject HttpClient Http
+
+SseClientTransport sseClientTransport = new SseClientTransport(
+    new SseClientTransportOptions() {
+        Endpoint = new Uri(config["LLM:MCP_ENDPOINT"] ?? "")
+        },
+    Http
+);
+```
 ### React
 ```
 "@modelcontextprotocol/sdk": "^1.13.0",
@@ -186,7 +231,7 @@ Uri AzureEndpoint = new Uri(config["LLM:EndPoint"] ?? "");
 IChatClient chatClient = new ChatClientBuilder(
     new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
     .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
-.UseFunctionInvocation()
+.UseFunctionInvocation() // LLM will call functions automatically with coding
 .Build();
 
 IList<McpClientTool> mcpTools = await mcpClient.ListToolsAsync(); //mcpClient created above
@@ -203,8 +248,25 @@ IList<Microsoft.Extensions.AI.ChatMessage> chatHistory =
 
 ChatResponse response = await chatClient.GetResponseAsync(chatHistory, chatOptions);
 ```
-### React UI (Not recommended. Risk of exposing the Azure API Key)
-* In actual implementation, the ModelClient's Uri should point to API's LLM Proxy.
+### .NET Blazor wasm (Direct call LLM not recommended. Risk of exposing the Azure API Key)
+* Solution: The LLM endpoint should point to LLM Proxy API.
+* LLM Proxy API add real API key and route to actual LLM endpoint.
+* Response will route back to Blazor wasm for processing.
+* Similiar to .NET above except:
+```
+// Create chat client with Azure OpenAI. Endpoint is a proxy API endpoint. Proxy will provide true API Key. API Key here is dummy.
+AzureKeyCredential AzureApiKeyCredential = new AzureKeyCredential("DummyKey");
+Uri AzureEndpoint = new Uri(config["LLM:LLM_PROXY_ENDPOINT"] ?? "");
+chatClient = new ChatClientBuilder(
+    new AzureOpenAIClient(AzureEndpoint, AzureApiKeyCredential)
+    .GetChatClient(config["LLM:ModelId"] ?? "").AsChatClient())
+.UseFunctionInvocation() // LLM will call functions automatically with coding
+.Build();
+```
+### ReactJS UI (Direct call LLM not recommended. Risk of exposing the Azure API Key)
+* Solution: The LLM endpoint should point to LLM Proxy API.
+* LLM Proxy API add real API key and route to actual LLM endpoint.
+* Response will route back to ReactJS for processing.
 ```
     "@azure-rest/ai-inference": "latest",
 ```
@@ -216,8 +278,8 @@ import { AzureKeyCredential } from "@azure/core-auth";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
-    const endpoint = config.LLM?.EndPoint;
-    const apiKey = config.LLM?.Azure_API_key;
+    const endpoint = config.LLM?.EndPoint; // LLM Proxy API endpoint
+    const apiKey = config.LLM?.Azure_API_key; //A dummy key. Actual key provide by API
     const modelId = config.LLM?.ModelId;
     const fullEndpoint = endpoint.replace(/\/$/, '') + '/openai/deployments/' + modelId;
     const llmClient = ModelClient(fullEndpoint, new AzureKeyCredential(apiKey));
