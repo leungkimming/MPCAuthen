@@ -10,9 +10,9 @@
     * Copy .env.example to .env in reacthost_ts
     * Run 'npm start'
     * React Chat UI will open in default browse. To see all debug messages, press [F12] in web browser
-## To test Blazor Client
+## To test Blazor wasm Client
 * Debug run the BlazorClient Project using 'https' profile (Kestrel) or IIS Express
-## Test case
+## Test cases for both ReactJS and Blazor wasm clients
 * Press [F12] to view console log
 * Test 1: 
     * Notice that MCP Server Connection Status: Connected
