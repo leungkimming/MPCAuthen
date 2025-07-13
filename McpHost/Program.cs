@@ -121,9 +121,11 @@ while (true)
     string content = response.ToString();
     Console.WriteLine($"Assistant> {content}");
     chatHistory.Add(new ChatMessage(ChatRole.Assistant, content));
+    // Just to log the function calls and results to console. Not requuired in production code.
     foreach (var message in response.Messages)
     {
-        foreach (var mcontent in message.Contents) {
+        foreach (var mcontent in message.Contents)
+        {
             if (mcontent is FunctionCallContent functionCallContent)
             {
                 OpenAI.Chat.ChatToolCall toolcall = functionCallContent.RawRepresentation as OpenAI.Chat.ChatToolCall;
