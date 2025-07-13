@@ -193,7 +193,7 @@ function App() {
                 {/* Chat message list */}
                 <div
                   className="chat-output"
-                  style={{ width: 800, height: 400, overflowY: 'auto', background: '#f8f8f8', padding: 10, borderRadius: 6, border: '1px solid #ccc' }}
+                  style={{ width: 800, height: 550, overflowY: 'auto', background: '#f8f8f8', padding: 10, borderRadius: 6, border: '1px solid #ccc' }}
                 >
                   {chatMessages.map((msg, idx) => (
                     msg.content && (

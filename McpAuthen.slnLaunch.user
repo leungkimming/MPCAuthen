@@ -24,7 +24,7 @@
       {
         "Path": "BlazorClient\\BlazorApp.csproj",
         "Action": "Start",
-        "DebugTarget": "IIS Express"
+        "DebugTarget": "https"
       }
     ]
   },
