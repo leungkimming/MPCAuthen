@@ -143,6 +143,12 @@ code {
     padding: 1.5rem;
 }
 
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
 .chat-app-container {
     display: flex;
     flex-direction: column;
