@@ -60,6 +60,7 @@ node_modules/
 
 # Build output
 dist/
+!BlazorClient/wwwroot/lib/bootstrap/dist/
 
 # Logs
 npm-debug.log*
@@ -80,3 +81,4 @@ yarn-error.log*
 
 # Coverage
 coverage/
+
